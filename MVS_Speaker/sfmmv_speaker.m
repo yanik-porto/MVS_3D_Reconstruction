@@ -4,12 +4,12 @@ clc;
 
 %% Use the |imageSet| object to get a list of all image file names in a
 % directory.
-imageDir = 'C:\Users\Yanik\Documents\VIBOT\MSCV1\S2\Visual Perception\VP - Sidibé\Project\Code\Matlab\MVS_3D_Reconstruction\MVS_casque\train_img';
+imageDir = 'C:\Users\Yanik\Documents\VIBOT\MSCV1\S2\Visual Perception\VP - Sidibé\Project\Code\Matlab\MVS_3D_Reconstruction\MVS_Speaker\train_img';
 imSet = imageSet(imageDir);
 
 %Display the images.
 figure
-montage(imSet.ImageLocation, 'Size', [4, 3]);
+montage(imSet.ImageLocation, 'Size', [5, 2]);
 title('Input Image Sequence');
 
 %Convert the images to grayscale.
@@ -20,10 +20,10 @@ for i = 1:imSet.Count
 end
 
 %Load camera parameters (created using Camera Calibrator app)
-load(fullfile(imageDir, 'webcamParams2.mat'));
+load(fullfile(imageDir, 'canonParams.mat'));
 
 %% Undistort the first image and Create a View Set Containing the First View
-I = undistortImage(images{1}, webcamParams2);
+I = undistortImage(images{1}, canonParams);
 % figure; imshow(I);
 
 %Detect features. Increasing 'NumOctaves' helps detect large-scale
@@ -50,7 +50,7 @@ vSet = addView(vSet, viewId, 'Points', prevPoints, 'Orientation', eye(3),...
 %% Add the Rest of the Views
 for i = 2:numel(images)
     % Undistort the current image.
-    I = undistortImage(images{i}, webcamParams2);
+    I = undistortImage(images{i}, canonParams);
 
     % Detect, extract and match features.
     currPoints   = detectSURFFeatures(I, 'NumOctaves', 8, 'ROI', roi);
@@ -67,7 +67,7 @@ for i = 2:numel(images)
     % the cameras in the previous view and the current view is set to 1.
     % This will be corrected by the bundle adjustment.
     [relativeOrient, relativeLoc, inlierIdx] = helperEstimateRelativePose(...
-        matchedPoints1, matchedPoints2, webcamParams2);
+        matchedPoints1, matchedPoints2, canonParams);
     
     % Add the current view to the view set.
     vSet = addView(vSet, i, 'Points', currPoints);
@@ -94,11 +94,11 @@ for i = 2:numel(images)
     camPoses = poses(vSet);
     
     % Triangulate initial locations for the 3-D world points.
-    xyzPoints = triangulateMultiview(tracks, camPoses, webcamParams2);
+    xyzPoints = triangulateMultiview(tracks, camPoses, canonParams);
     
     % Refine the 3-D world points and camera poses.
     [xyzPoints, camPoses, reprojectionErrors] = bundleAdjustment(xyzPoints, ...
-        tracks, camPoses, webcamParams2, 'FixedViewId', 1, ...
+        tracks, camPoses, canonParams, 'FixedViewId', 1, ...
         'PointsUndistorted', true);
     
     % Store the refined camera poses.
@@ -136,7 +136,7 @@ title('Refined Camera Poses');
 %% Compute Dense Reconstruction
 
 % Read and undistort the first image
-I = undistortImage(images{1}, webcamParams2);
+I = undistortImage(images{1}, canonParams);
 
 % Detect corners in the first image.
 prevPoints = detectMinEigenFeatures(I, 'MinQuality', 0.001);
@@ -155,7 +155,7 @@ vSet = updateView(vSet, 1, 'Points', prevPoints);
 % Track the points across all views.
 for i = 2:numel(images)
     % Read and undistort the current image.
-    I = undistortImage(images{i}, webcamParams2);
+    I = undistortImage(images{i}, canonParams);
 
     % Track the points.
     [currPoints, validIdx] = step(tracker, I);
@@ -180,11 +180,11 @@ camPoses = poses(vSet);
 
 % Triangulate initial locations for the 3-D world points.
 xyzPoints = triangulateMultiview(tracks, camPoses,...
-    webcamParams2);
+    canonParams);
 
 % Refine the 3-D world points and camera poses.
 [xyzPoints, camPoses, reprojectionErrors] = bundleAdjustment(...
-    xyzPoints, tracks, camPoses, webcamParams2, 'FixedViewId', 1, ...
+    xyzPoints, tracks, camPoses, canonParams, 'FixedViewId', 1, ...
     'PointsUndistorted', true);
 
 %% Display Dense Reconstruction
